@@ -1,0 +1,74 @@
+# Express and Mongoose Starter
+
+A JavaScript REST API starter built with Node.js, Express, and Mongoose.
+
+## Requirements
+
+- Node.js 20 or newer
+- MongoDB running locally, or a MongoDB connection URI
+
+## Setup
+
+```sh
+npm install
+```
+
+Copy `.env.example` to `.env` and adjust `MONGODB_URI` or `PORT` if needed. Start the server with:
+
+```sh
+npm start
+```
+
+For development with Node's watch mode:
+
+```sh
+npm run dev
+```
+
+The server connects to MongoDB before listening. The default URI is `mongodb://127.0.0.1:27017/express_mongoose_starter`, and the default port is `3000`.
+
+## Mongoose models
+
+The schemas in `src/models` create the `employees`, `locations`, and `attendances` collections. Mongoose adds `_id`, `createdAt`, and `updatedAt` automatically.
+
+- `Employee`: unique `empCode`, required `name` and `employmentStart`, optional contact/department/end date, and an `isActive` flag (default `true`).
+- `Location`: unique `code`, required `name` and `type` (`SHOP` or `OFFICE`), optional address, and an `isActive` flag (default `true`).
+- `Attendance`: required employee and location references, denormalized employee/location codes, a validated `YYYY-MM-DD` date, an action (`CHECK_IN` or `CHECK_OUT`), timestamp, and optional notes. It has indexes for employee history and location/day queries.
+
+## API
+
+### Employees
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/employees` | List all employees, sorted by employee code |
+| `GET` | `/api/employees/:empCode` | Get an employee by code |
+| `POST` | `/api/employees` | Create an employee |
+| `PUT` | `/api/employees/:empCode` | Update an employee by code |
+
+Create and update requests use `Content-Type: application/json`. Employee fields are `empCode`, `name`, `email`, `department`, `employmentStart`, `employmentEnd`, and `isActive`. `empCode`, `name`, and `employmentStart` are required when creating an employee. Updates may include one or more of the employee fields.
+
+Example create request:
+
+```json
+{
+  "empCode": "E001",
+  "name": "Chan Tai Man",
+  "email": "chan@example.com",
+  "department": "IT",
+  "employmentStart": "2024-03-01"
+}
+```
+
+Duplicate employee codes return `409`; invalid employee data returns `400`; unknown employee codes return `404`.
+
+### Attendance
+
+Submit an attendance event with `POST /api/attendance/checkIn` or `POST /api/attendance/checkOut`. Both endpoints require an active employee and active location matching the supplied codes. The API records the current UTC timestamp and UTC calendar date and returns the created attendance record.
+
+```json
+{
+  "empCode": "E001",
+  "locationCode": "SH001"
+}
+```
