@@ -1,4 +1,5 @@
 const express = require('express');
+const adminRoutes = require('./routes/admins');
 const attendanceRoutes = require('./routes/attendance');
 const employeeRoutes = require('./routes/employees');
 const locationRoutes = require('./routes/locations');
@@ -11,6 +12,7 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+app.use('/api/admins', adminRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/locations', locationRoutes);

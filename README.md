@@ -29,13 +29,40 @@ The server connects to MongoDB before listening. The default URI is `mongodb://1
 
 ## Mongoose models
 
-The schemas in `src/models` create the `employees`, `locations`, and `attendances` collections. Mongoose adds `_id`, `createdAt`, and `updatedAt` automatically.
+The schemas in `src/models` create the `admins`, `employees`, `locations`, and `attendances` collections. Mongoose adds `_id`, `createdAt`, and `updatedAt` automatically.
 
+- `Admin`: unique username and email, required password and name, optional role (`SUPER_ADMIN` or `ADMIN`), an `isActive` flag (default `true`), and an optional last login date. Usernames and emails are stored in lowercase, and passwords are hashed before storage and excluded from JSON responses.
 - `Employee`: unique `empCode`, required `name` and `employmentStart`, optional contact/department/end date, and an `isActive` flag (default `true`).
 - `Location`: unique `code`, required `name` and `type` (`SHOP` or `OFFICE`), optional address, and an `isActive` flag (default `true`).
 - `Attendance`: required employee and location references, denormalized employee/location codes, a validated `YYYY-MM-DD` date, an action (`CHECK_IN` or `CHECK_OUT`), timestamp, and optional notes. It has indexes for employee history and location/day queries.
 
 ## API
+
+### Admins
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/admins` | List all admins, sorted by username |
+| `GET` | `/api/admins/:username` | Get an admin by username |
+| `POST` | `/api/admins` | Create an admin |
+| `PUT` | `/api/admins/:username` | Update an admin by username |
+| `DELETE` | `/api/admins/:username` | Delete an admin by username |
+
+Create and update requests use `Content-Type: application/json`. Admin fields are `username`, `email`, `password`, `name`, `role`, `isActive`, and `lastLogin`. `username`, `email`, `password`, and `name` are required when creating an admin. Usernames and emails are normalized to lowercase. Passwords are hashed before storage and are not included in API responses.
+
+Example create request:
+
+```json
+{
+  "username": "jane.admin",
+  "email": "jane@example.com",
+  "password": "change-this-password",
+  "name": "Jane Admin",
+  "role": "ADMIN"
+}
+```
+
+Invalid admin data returns `400`; unknown usernames return `404`.
 
 ### Employees
 
