@@ -62,6 +62,31 @@ Example create request:
 
 Duplicate employee codes return `409`; invalid employee data returns `400`; unknown employee codes return `404`.
 
+### Locations
+
+| Method | Path | Description |
+| --- | --- | --- |
+| `GET` | `/api/locations` | List all locations, sorted by location code |
+| `POST` | `/api/locations` | Create a location |
+| `GET` | `/api/locations/:code` | Get a location by code |
+| `PUT` | `/api/locations/:code` | Update a location by code |
+
+Create and update requests use `Content-Type: application/json`. Location fields are `code`, `name`, `type`, `address`, and `isActive`. `code`, `name`, and `type` are required when creating a location. Updates may include one or more of the location fields.
+
+Example create request:
+
+```json
+{
+  "code": "OF001",
+  "name": "Central Office",
+  "type": "OFFICE",
+  "address": "1 Harbour Road",
+  "isActive": true
+}
+```
+
+Duplicate location codes return `409`; invalid location data returns `400`; unknown location codes return `404`.
+
 ### Attendance
 
 Submit an attendance event with `POST /api/attendance/checkIn` or `POST /api/attendance/checkOut`. Both endpoints require an active employee and active location matching the supplied codes. The API records the current UTC timestamp and UTC calendar date and returns the created attendance record.

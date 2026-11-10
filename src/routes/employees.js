@@ -85,4 +85,12 @@ router.put('/:empCode', async (req, res) => {
   return res.json(employee);
 });
 
+router.use((error, req, res, next) => {
+  if (error.code === 11000) {
+    return res.status(409).json({ error: 'Employee code already exists' });
+  }
+
+  return next(error);
+});
+
 module.exports = router;
