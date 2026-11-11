@@ -1,56 +1,106 @@
-# Express and Mongoose Starter
+# Time and Attendance API
 
-A JavaScript REST API starter built with Node.js, Express, and Mongoose.
+This project exposes a small Express + Mongoose REST API for managing admins, employees, locations, and attendance check-ins/check-outs.
 
 ## Requirements
 
 - Node.js 20 or newer
-- MongoDB running locally, or a MongoDB connection URI
+- MongoDB running locally or a reachable MongoDB URI
 
-## Setup
+## Installation
 
-```sh
+```bash
 npm install
 ```
 
-Copy `.env.example` to `.env` and adjust `MONGODB_URI` or `PORT` if needed. Start the server with:
+## Environment variables
 
-```sh
+Set the following variables before starting the API:
+
+```bash
+JWT_SECRET=your-access-secret
+JWT_REFRESH_SECRET=your-refresh-secret
+JWT_ACCESS_TOKEN_EXPIRES_IN=15m
+JWT_REFRESH_TOKEN_EXPIRES_IN=7d
+```
+
+The server reads `JWT_SECRET` and `JWT_REFRESH_SECRET` from environment variables when creating and verifying access/refresh tokens.
+
+## Start the server
+
+```bash
 npm start
 ```
 
-For development with Node's watch mode:
+For development watch mode:
 
-```sh
+```bash
 npm run dev
 ```
 
-The server connects to MongoDB before listening. The default URI is `mongodb://127.0.0.1:27017/express_mongoose_starter`, and the default port is `3000`.
+The app also exposes a health route:
 
-## Mongoose models
+```http
+GET /health
+```
 
-The schemas in `src/models` create the `admins`, `employees`, `locations`, and `attendances` collections. Mongoose adds `_id`, `createdAt`, and `updatedAt` automatically.
+Response:
 
-- `Admin`: unique username and email, required password and name, optional role (`SUPER_ADMIN` or `ADMIN`), an `isActive` flag (default `true`), and an optional last login date. Usernames and emails are stored in lowercase, and passwords are hashed before storage and excluded from JSON responses.
-- `Employee`: unique `empCode`, required `name` and `employmentStart`, optional contact/department/end date, and an `isActive` flag (default `true`).
-- `Location`: unique `code`, required `name` and `type` (`SHOP` or `OFFICE`), optional address, and an `isActive` flag (default `true`).
-- `Attendance`: required employee and location references, denormalized employee/location codes, a validated `YYYY-MM-DD` date, an action (`CHECK_IN` or `CHECK_OUT`), timestamp, and optional notes. It has indexes for employee history and location/day queries.
+```json
+{
+  "status": "ok"
+}
+```
 
-## API
+## Authentication
 
-### Admins
+Protected routes require a bearer token in the `Authorization` header:
 
-| Method | Path | Description |
-| --- | --- | --- |
-| `GET` | `/api/admins` | List all admins, sorted by username |
-| `GET` | `/api/admins/:username` | Get an admin by username |
-| `POST` | `/api/admins` | Create an admin |
-| `PUT` | `/api/admins/:username` | Update an admin by username |
-| `DELETE` | `/api/admins/:username` | Delete an admin by username |
+```http
+Authorization: Bearer <accessToken>
+```
 
-Create and update requests use `Content-Type: application/json`. Admin fields are `username`, `email`, `password`, `name`, `role`, `isActive`, and `lastLogin`. `username`, `email`, `password`, and `name` are required when creating an admin. Usernames and emails are normalized to lowercase. Passwords are hashed before storage and are not included in API responses.
+The admin auth flow is:
 
-Example create request:
+- `POST /api/admins/login` — authenticate an admin and return `accessToken` and `refreshToken`
+- `POST /api/admins/token` — exchange a valid refresh token for a new access token and refresh token
+- All other admin routes are protected by `authenticateToken`
+
+## API routes
+
+### 1) Admin routes
+
+Base path: `/api/admins`
+
+| Method | Path | Auth required | Description |
+| --- | --- | --- | --- |
+| `POST` | `/api/admins/login` | No | Login with username and password |
+| `POST` | `/api/admins/token` | No | Exchange a refresh token for new tokens |
+| `GET` | `/api/admins` | Yes | List all admins sorted by username |
+| `GET` | `/api/admins/:username` | Yes | Get an admin by username |
+| `POST` | `/api/admins` | Yes | Create an admin |
+| `PUT` | `/api/admins/:username` | Yes | Update an admin by username |
+| `DELETE` | `/api/admins/:username` | Yes | Delete an admin by username |
+
+#### Admin login request
+
+```json
+{
+  "username": "admin",
+  "password": "secret123"
+}
+```
+
+Successful response:
+
+```json
+{
+  "accessToken": "<jwt>",
+  "refreshToken": "<jwt>"
+}
+```
+
+#### Admin create request
 
 ```json
 {
@@ -58,24 +108,30 @@ Example create request:
   "email": "jane@example.com",
   "password": "change-this-password",
   "name": "Jane Admin",
-  "role": "ADMIN"
+  "role": "ADMIN",
+  "isActive": true
 }
 ```
 
-Invalid admin data returns `400`; unknown usernames return `404`.
+Notes:
 
-### Employees
+- `username`, `email`, `password`, and `name` are required for create.
+- `username` and `email` are normalized to lowercase before saving.
+- Passwords are hashed before persistence.
+- Unsupported fields are rejected with `400`.
 
-| Method | Path | Description |
-| --- | --- | --- |
-| `GET` | `/api/employees` | List all employees, sorted by employee code |
-| `GET` | `/api/employees/:empCode` | Get an employee by code |
-| `POST` | `/api/employees` | Create an employee |
-| `PUT` | `/api/employees/:empCode` | Update an employee by code |
+### 2) Employee routes
 
-Create and update requests use `Content-Type: application/json`. Employee fields are `empCode`, `name`, `email`, `department`, `employmentStart`, `employmentEnd`, and `isActive`. `empCode`, `name`, and `employmentStart` are required when creating an employee. Updates may include one or more of the employee fields.
+Base path: `/api/employees`
 
-Example create request:
+| Method | Path | Auth required | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/employees` | No | List all employees sorted by employee code |
+| `GET` | `/api/employees/:empCode` | No | Get an employee by `empCode` |
+| `POST` | `/api/employees` | Yes | Create an employee |
+| `PUT` | `/api/employees/:empCode` | Yes | Update an employee by `empCode` |
+
+#### Employee create request
 
 ```json
 {
@@ -83,24 +139,28 @@ Example create request:
   "name": "Chan Tai Man",
   "email": "chan@example.com",
   "department": "IT",
-  "employmentStart": "2024-03-01"
+  "employmentStart": "2024-03-01",
+  "isActive": true
 }
 ```
 
-Duplicate employee codes return `409`; invalid employee data returns `400`; unknown employee codes return `404`.
+Notes:
 
-### Locations
+- `empCode`, `name`, and `employmentStart` are required on create.
+- Duplicate employee codes return `409`.
 
-| Method | Path | Description |
-| --- | --- | --- |
-| `GET` | `/api/locations` | List all locations, sorted by location code |
-| `POST` | `/api/locations` | Create a location |
-| `GET` | `/api/locations/:code` | Get a location by code |
-| `PUT` | `/api/locations/:code` | Update a location by code |
+### 3) Location routes
 
-Create and update requests use `Content-Type: application/json`. Location fields are `code`, `name`, `type`, `address`, and `isActive`. `code`, `name`, and `type` are required when creating a location. Updates may include one or more of the location fields.
+Base path: `/api/locations`
 
-Example create request:
+| Method | Path | Auth required | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/locations` | No | List all locations sorted by code |
+| `POST` | `/api/locations` | Yes | Create a location |
+| `GET` | `/api/locations/:code` | No | Get a location by code |
+| `PUT` | `/api/locations/:code` | Yes | Update a location by code |
+
+#### Location create request
 
 ```json
 {
@@ -112,15 +172,84 @@ Example create request:
 }
 ```
 
-Duplicate location codes return `409`; invalid location data returns `400`; unknown location codes return `404`.
+Notes:
 
-### Attendance
+- `code`, `name`, and `type` are required on create.
+- Duplicate location codes return `409`.
 
-Submit an attendance event with `POST /api/attendance/checkIn` or `POST /api/attendance/checkOut`. Both endpoints require an active employee and active location matching the supplied codes. The API records the current UTC timestamp and UTC calendar date and returns the created attendance record.
+### 4) Attendance routes
+
+Base path: `/api/attendance`
+
+| Method | Path | Auth required | Description |
+| --- | --- | --- | --- |
+| `POST` | `/api/attendance/checkIn` | No | Record a check-in event |
+| `POST` | `/api/attendance/checkOut` | No | Record a check-out event |
+
+#### Attendance request body
 
 ```json
 {
   "empCode": "E001",
-  "locationCode": "SH001"
+  "locationCode": "OF001"
 }
+```
+
+The endpoint:
+
+- validates that both `empCode` and `locationCode` are present
+- looks up an active employee and active location
+- creates an attendance record with the current timestamp and ISO date
+- stores `actionType` as either `CHECK_IN` or `CHECK_OUT`
+
+Example successful response:
+
+```json
+{
+  "_id": "...",
+  "employeeId": "...",
+  "empCode": "E001",
+  "locationId": "...",
+  "locationCode": "OF001",
+  "date": "2026-11-12",
+  "actionType": "CHECK_IN",
+  "timestamp": "2026-11-12T00:00:00.000Z"
+}
+```
+
+## Common status codes
+
+- `200` — success for reads and updates
+- `201` — created
+- `400` — invalid request body or validation error
+- `401` — unauthorized / invalid token
+- `404` — resource not found
+- `409` — duplicate code already exists
+- `500` — internal server error
+
+## Route summary
+
+```text
+GET /health
+
+POST /api/admins/login
+POST /api/admins/token
+GET /api/admins
+GET /api/admins/:username
+POST /api/admins
+PUT /api/admins/:username
+DELETE /api/admins/:username
+
+GET /api/employees
+GET /api/employees/:empCode
+POST /api/employees
+PUT /api/employees/:empCode
+
+GET /api/locations
+POST /api/locations
+GET /api/locations/:code
+PUT /api/locations/:code
+
+POST /api/attendance/checkIn
+POST /api/attendance/checkOut
 ```

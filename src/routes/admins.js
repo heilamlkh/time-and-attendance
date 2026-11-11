@@ -1,5 +1,12 @@
 const express = require("express");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 const Admin = require("../models/Admin");
+const {
+  getRefreshSecret,
+  authenticateToken,
+  createToken,
+} = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -38,6 +45,80 @@ function pickAdminFields(body) {
 function hasUnsupportedFields(body) {
   return Object.keys(body).some((field) => !adminFields.includes(field));
 }
+
+router.post("/login", async (req, res) => {
+  if (!isRequestBody(req.body)) {
+    return res
+      .status(400)
+      .json({ error: "Request body must be a JSON object" });
+  }
+
+  const username =
+    typeof req.body.username === "string"
+      ? req.body.username.trim().toLowerCase()
+      : "";
+  const password =
+    typeof req.body.password === "string" ? req.body.password : "";
+
+  if (!username || !password) {
+    return res.status(400).json({
+      error: "username and password are required",
+    });
+  }
+
+  const admin = await Admin.findOne({ username });
+  if (!admin) {
+    return res.status(401).json({ error: "Invalid username or password" });
+  }
+
+  const isValidPassword = await bcrypt.compare(password, admin.password);
+  if (!isValidPassword) {
+    return res.status(401).json({ error: "Invalid username or password" });
+  }
+
+  const accessToken = createToken(admin.username, "access");
+  const refreshToken = createToken(admin.username, "refresh");
+
+  return res.json({ accessToken, refreshToken });
+});
+
+router.post("/token", async (req, res) => {
+  if (!isRequestBody(req.body)) {
+    return res
+      .status(400)
+      .json({ error: "Request body must be a JSON object" });
+  }
+
+  const refreshToken =
+    typeof req.body.refreshToken === "string"
+      ? req.body.refreshToken.trim()
+      : "";
+
+  if (!refreshToken) {
+    return res.status(400).json({ error: "refreshToken is required" });
+  }
+
+  try {
+    const payload = jwt.verify(refreshToken, getRefreshSecret());
+
+    if (
+      !payload ||
+      payload.type !== "refresh" ||
+      typeof payload.username !== "string" ||
+      !payload.username.trim()
+    ) {
+      return res.status(401).json({ error: "Invalid refresh token" });
+    }
+
+    const accessToken = createToken(payload.username, "access");
+    const newRefreshToken = createToken(payload.username, "refresh");
+    return res.json({ accessToken, refreshToken: newRefreshToken });
+  } catch (error) {
+    return res.status(401).json({ error: "Invalid refresh token" });
+  }
+});
+
+router.use(authenticateToken);
 
 router.get("/", async (req, res) => {
   const admins = await Admin.find().sort({ username: 1 });

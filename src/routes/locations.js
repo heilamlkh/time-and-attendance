@@ -1,5 +1,6 @@
 const express = require("express");
 const Location = require("../models/Location");
+const { authenticateToken } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -26,7 +27,7 @@ router.get("/", async (req, res) => {
   return res.json(locations);
 });
 
-router.post("/", async (req, res) => {
+router.post("/", authenticateToken, async (req, res) => {
   if (!isRequestBody(req.body)) {
     return res
       .status(400)
@@ -57,7 +58,7 @@ router.get("/:code", async (req, res) => {
   return res.json(location);
 });
 
-router.put("/:code", async (req, res) => {
+router.put("/:code", authenticateToken, async (req, res) => {
   if (!isRequestBody(req.body)) {
     return res
       .status(400)

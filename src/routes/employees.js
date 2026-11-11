@@ -1,5 +1,6 @@
 const express = require('express');
 const Employee = require('../models/Employee');
+const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -48,7 +49,7 @@ router.get('/:empCode', async (req, res) => {
   return res.json(employee);
 });
 
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   if (!isRequestBody(req.body)) {
     return res.status(400).json({ error: 'Request body must be a JSON object' });
   }
@@ -60,7 +61,7 @@ router.post('/', async (req, res) => {
   return res.status(201).json(employee);
 });
 
-router.put('/:empCode', async (req, res) => {
+router.put('/:empCode', authenticateToken, async (req, res) => {
   if (!isRequestBody(req.body)) {
     return res.status(400).json({ error: 'Request body must be a JSON object' });
   }
